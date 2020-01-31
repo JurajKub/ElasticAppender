@@ -82,6 +82,11 @@ public class L4JElasticAppender extends AbstractAppender {
 	
 	/** Computed index name to persist logs into. */
 	private String computedIndex;
+	
+	/** Used to identify the index belongs to this appender.
+	 * Example usage: 3rd party app can fetch all logs made by this appender from shared Elasticsearch cluster.
+	 */
+	private static final String INDEX_PREFFIX = "l4jea_";
 
 	/**
 	 * Batching logic using {@link RestHighLevelClient}'s async bulk operations.
@@ -172,7 +177,7 @@ public class L4JElasticAppender extends AbstractAppender {
 	 */
 	public void calculateCurrentDate() {
 		this.computedDate = this.dateFormat.format(new Date());
-		this.computedIndex = new StringBuilder().append(this.index).append("_").append(this.computedDate).toString();
+		this.computedIndex = new StringBuilder().append(L4JElasticAppender.INDEX_PREFFIX).append(this.index).append("_").append(this.computedDate).toString();
 	}
 
 	/**
