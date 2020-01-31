@@ -8,8 +8,6 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -57,8 +55,6 @@ import com.jkubinyi.elasticappender.batch.Batcher.BatchProcessor;
  */
 @Plugin(name = "ElasticAppender", category = Core.CATEGORY_NAME, elementType = Appender.ELEMENT_TYPE)
 public class L4JElasticAppender extends AbstractAppender {
-
-	protected ConcurrentMap<String, LogEvent> eventMap = new ConcurrentHashMap<>();
 
 	private final String index;
 	private final NodeConnection[] nodeConnections;
