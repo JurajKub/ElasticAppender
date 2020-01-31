@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration packages="com.jkubinyi.elasticappender">
+	<Appenders>
+		<Console name="Console" target="SYSTEM_OUT">
+			<PatternLayout
+				pattern="%style{%d{ISO8601}}{black} %highlight{%-5level }[%style{%t}{bright,blue}] %style{%C{1.}}{bright,yellow}: %msg%n%throwable" />
+		</Console>
+		<ElasticAppender name="Elastic" index="log" bulkSize="1" maxUnprocessedLogs="500">
+			<!-- List of EL nodes, if more than one robin-round will be used. In none present will fallback to http://localhost:9200 -->
+			<NodeConnection scheme="http" host="URL" port="9200" />
+		</ElasticAppender>
+	</Appenders>
+	<Loggers>
+		<Root level="info">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="Elastic" />
+		</Root>
+		<Logger name="com.jkubinyi.simplerest" level="trace" />
+	</Loggers>
+</Configuration>
