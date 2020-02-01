@@ -163,6 +163,13 @@ public class L4JElasticAppender extends AbstractAppender {
 		this.createRestClient();
 		this.calculateCurrentDate();
 	}
+	
+	/**
+	 * @return Gets the currently used prefix for the index name.
+	 */
+	public static String getPrefix() {
+		return L4JElasticAppender.INDEX_PREFFIX;
+	}
 
 	/**
 	 * @return Returns {@code true} if appender was set to use logs during initialization. It MAY behave as
