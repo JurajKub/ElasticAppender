@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.LinkedHashSet;
-import java.util.Set;
 
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
@@ -18,19 +16,13 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
-import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.DisMaxQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.elasticsearch.search.sort.SortOrder;
 
 import com.jkubinyi.elasticappender.L4JElasticAppender;
-import com.jkubinyi.elasticappender.search.field.LogField;
-import com.jkubinyi.elasticappender.search.field.LogField.ConditionType;
-import com.jkubinyi.elasticappender.search.field.LogField.FieldBuilder;
-import com.jkubinyi.elasticappender.search.field.SimpleQueryStringFields;
+import com.jkubinyi.elasticappender.search.common.Field;
+import com.jkubinyi.elasticappender.search.query.Group;
 
 /**
  * <p>EASearch is a short name for ElasticAppender Search. Provides a set of utilities which
@@ -39,7 +31,7 @@ import com.jkubinyi.elasticappender.search.field.SimpleQueryStringFields;
  * exposed fields from the Log4J to the Elasticsearch are mapped in the {@link Field} enum.<br>
  * Class requires at least one node connection and same index name with date format used in
  * ElasticAppender configuration.</p>
- * <p>Class includes a {@link FulltextSearchQuery} which together with {@link LogField}
+ * <p>Class includes a {@link FulltextBooleanQuery} which together with {@link LogField}
  * handles query generation. Elasticsearch uses a concept of leaf queries and compound queries.<br>
  * Leaf queries are looking at particular field's value and matches against it. They can be nested.<br>
  * Compound queries are aggregation clauses used to merge scores of leaf queries nested inside.<br>
@@ -60,7 +52,7 @@ import com.jkubinyi.elasticappender.search.field.SimpleQueryStringFields;
  * </ul>
  * <br>
  * <br>
- * Class uses a Bool wrapper query by default, but it can be changed in the {@link FulltextSearchQuery}.
+ * Class uses a Bool wrapper query by default, but it can be changed in the {@link FulltextBooleanQuery}.
  * </p>
  * 
  * @author jurajkubinyi
@@ -188,115 +180,33 @@ public class EASearch {
 	}
 	
 	/**
-	 * @return Returns instance of FulltextSearchQuery responsible for entire communication and query generation.
+	 * @return Returns instance of BooleanQuery responsible for entire communication and query generation.
 	 */
-	public FulltextSearchQuery fulltextSearch() {
-		return new FulltextSearchQuery();
+	public BooleanQuery fulltextSearch() {
+		return new BooleanQuery();
 	}
 	
 	/**
 	 * Class abstracting creation of the query structure in a more developer friendly manner with minimum-to-no
 	 * Elasticsearch required knowledge. Supports several types of leaf query types and compound queries.
-	 * Compound (wrapper) queries can be set using {@link #setWrapType(WrapType)}. Together with {@link LogField}
-	 * enables easy horizontal and vertical condition generation.
+	 * Compound (wrapper) queries can be set using {@link #setWrapType(WrapType)}.
 	 * 
 	 * @author jurajkubinyi
 	 *
 	 */
-	public class FulltextSearchQuery extends SearchQuery {
-		
-		public WrapType wrapQueryType = WrapType.sum;
-		
-		/**
-		 * Sets the type of the compound (wrapper) class used. Depending on the setting the Elasticsearch
-		 * will return results scores.
-		 * @param type
-		 * @return
-		 */
-		public FulltextSearchQuery setWrapType(WrapType type) {
-			this.wrapQueryType = type;
-			return this;
-		}
-		
-		@Override
-		protected QueryBuilder buildQuery() {
-			Set<LogField> fields = this.getAllFields();
-			if(fields.size() > 1) { // More than field
-				if(this.wrapQueryType == WrapType.sum) {
-					BoolQueryBuilder rootQuery = QueryBuilders.boolQuery();
-					
-					for(LogField field : fields) {
-						QueryBuilder fieldQuery = field.buildQTree();
-						if(field.getConditionType() == ConditionType.must)
-							rootQuery.must(fieldQuery);
-						else if(field.getConditionType() == ConditionType.mustNot)
-							rootQuery.mustNot(fieldQuery);
-						else if(field.getConditionType() == ConditionType.should)
-							rootQuery.should(fieldQuery);
-						else if(field.getConditionType() == ConditionType.filter)
-							rootQuery.filter(fieldQuery);
-					}
-					return rootQuery;
-				} else {
-					DisMaxQueryBuilder rootQuery = QueryBuilders.disMaxQuery();
-					
-					for(LogField field : fields) {
-						QueryBuilder fieldQuery = field.buildQTree();
-						rootQuery.add(fieldQuery);
-					}
-					return rootQuery;
-				}
-			} else {
-				LogField field = fields.stream().findFirst().get();
-				return field.buildQTree();
-			}
-		}
-	}
 	
-	public abstract class SearchQuery {
+	public class BooleanQuery extends Group {
 		
-		private Set<LogField> fieldsSet = new LinkedHashSet<>();
 		private Field sortingField;
 		private SortOrder sortOrder = SortOrder.ASC;
 		private boolean shouldSort = false;
 		
-		protected abstract QueryBuilder buildQuery();
-		
-		/**
-		 * @return All fields on this level which will be used to generate query.
-		 * If you need to traverse entire tree you need to traverse each {@link LogField}
-		 * one by one.
-		 */
-		public Set<LogField> getAllFields() {
-			return this.fieldsSet;
-		}
-		
-		/**
-		 * Adds the field to this level in the tree.
-		 * @param field Field which will be added to the tree.
-		 * @return SearchQuery query building class reference.
-		 */
-		public SearchQuery addField(LogField field) {
-			this.fieldsSet.add(field);
-			return this;
-		}
-
-		/**
-		 * Adds the field to this level in the tree.
-		 * @param field Field which will be added to the tree.
-		 * @return SearchQuery query building class reference.
-		 */
-		public SearchQuery addField(FieldBuilder field) {
-			this.fieldsSet.add(field.make());
-			return this;
-		}
-		
 		/**
 		 * Allows sorting on the result documents. Please see
 		 * {@link #sortOrder(SortOrder)} and {@link #noSorting()}.
-		 * @return SearchQuery query building class reference.
+		 * @return BooleanQuery query building class reference.
 		 */
-		public SearchQuery useSorting() {
+		public BooleanQuery useSorting() {
 			this.shouldSort = true;
 			return this;
 		}
@@ -304,9 +214,9 @@ public class EASearch {
 		/**
 		 * Allows sorting on the result documents. Please see
 		 * {@link #sortOrder(SortOrder)} and {@link #useSorting()}.
-		 * @return SearchQuery query building class reference.
+		 * @return BooleanQuery query building class reference.
 		 */
-		public SearchQuery noSorting() {
+		public BooleanQuery noSorting() {
 			this.shouldSort = false;
 			return this;
 		}
@@ -314,9 +224,9 @@ public class EASearch {
 		/**
 		 * Sets the preferred sorting order.
 		 * @param sortOrder ASC or DESC.
-		 * @return SearchQuery query building class reference.
+		 * @return BooleanQuery query building class reference.
 		 */
-		public SearchQuery sortOrder(SortOrder sortOrder) {
+		public BooleanQuery sortOrder(SortOrder sortOrder) {
 			this.sortOrder = sortOrder;
 			return this;
 		}
@@ -324,9 +234,9 @@ public class EASearch {
 		/**
 		 * Enables sorting of the result documents on this field.
 		 * @param field Field name which will be used for filtering.
-		 * @return SearchQuery query building class reference.
+		 * @return BooleanQuery query building class reference.
 		 */
-		public SearchQuery sortingOnField(Field field) {
+		public BooleanQuery sortingOnField(Field field) {
 			this.sortingField = field;
 			return this;
 		}
@@ -388,7 +298,6 @@ public class EASearch {
 			if(this.shouldSort && this.sortingField != null)
 				searchSourceBuilder.sort(new FieldSortBuilder(this.sortingField.toString()).order(this.sortOrder));
 			searchSourceBuilder.query(this.buildQuery());
-			System.out.println(searchSourceBuilder);
 			return searchSourceBuilder;
 		}
 	}
