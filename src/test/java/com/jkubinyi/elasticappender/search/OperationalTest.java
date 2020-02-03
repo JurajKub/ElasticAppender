@@ -11,8 +11,8 @@ import org.apache.logging.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.jkubinyi.elasticappender.common.LogIndex;
 import com.jkubinyi.elasticappender.search.EASearch.BooleanQueryBuilder;
-import com.jkubinyi.elasticappender.search.EASearch.LogIndex;
 import com.jkubinyi.elasticappender.search.common.Field;
 import com.jkubinyi.elasticappender.search.query.Group;
 

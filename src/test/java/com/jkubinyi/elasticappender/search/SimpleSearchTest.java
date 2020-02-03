@@ -11,8 +11,8 @@ import org.apache.logging.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.jkubinyi.elasticappender.common.LogIndex;
 import com.jkubinyi.elasticappender.record.LogRecord;
-import com.jkubinyi.elasticappender.search.EASearch.LogIndex;
 import com.jkubinyi.elasticappender.search.common.Field;
 
 public class SimpleSearchTest {

@@ -3,11 +3,9 @@ package com.jkubinyi.elasticappender;
 import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.security.InvalidParameterException;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Date;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -41,6 +39,8 @@ import org.elasticsearch.common.xcontent.XContentType;
 
 import com.jkubinyi.elasticappender.batch.Batcher;
 import com.jkubinyi.elasticappender.batch.BlockingQueueBatcher;
+import com.jkubinyi.elasticappender.common.LogIndex;
+import com.jkubinyi.elasticappender.search.EASearch;
 import com.jkubinyi.elasticappender.batch.Batcher.BatchProcessor;
 
 /**
@@ -55,18 +55,13 @@ import com.jkubinyi.elasticappender.batch.Batcher.BatchProcessor;
  */
 @Plugin(name = "ElasticAppender", category = Core.CATEGORY_NAME, elementType = Appender.ELEMENT_TYPE)
 public class L4JElasticAppender extends AbstractAppender {
-
-	private final String index;
+	
 	private final NodeConnection[] nodeConnections;
 	private final boolean useBulk;
 	private final int bulkSize;
 	private final String user;
 	private final String password;
-	private final DateFormat dateFormat;
 	private final int maxUnprocessedLogs;
-
-	/** Used for bulk sending. */
-	private RestHighLevelClient restClient;
 
 	/** Number of logs which were not persisted. */
 	private final AtomicLong swallowedLogs = new AtomicLong(0);
@@ -77,11 +72,14 @@ public class L4JElasticAppender extends AbstractAppender {
 	/** Processor instance having the processing of the batches logic. */
 	private final BatchProcessor<IndexRequest> asyncBatchProcessor = new AsyncBatchProcessor();
 
-	/** Computed date used to distinguish log indexes. */
-	private String computedDate;
+	/** Computed index used to distinguish log indexes. */
+	private final LogIndex logIndex;
 	
-	/** Computed index name to persist logs into. */
-	private String computedIndex;
+	/** Used for bulk sending. */
+	private RestHighLevelClient restClient;
+	
+	/** CredentialsProvider containing potential username and password **/
+	private CredentialsProvider credentialsProvider;
 	
 	/** Used to identify the index belongs to this appender.
 	 * Example usage: 3rd party app can fetch all logs made by this appender from shared Elasticsearch cluster.
@@ -134,18 +132,17 @@ public class L4JElasticAppender extends AbstractAppender {
 	 * @param password If username is not null the password will be used during authentication.
 	 * @param maxUnprocessedLogs Maximum number of unprocessed, piled up logs in the cache. No more logs will be persisted when the cache
 	 * is full till they will be cleared by the batching algorithm.
-	 * @param dateFormat The actual computed date using this format will be appended to the index name in order to create a unique index name.
+	 * @param logIndex The actual index in which will be the logs stored to.
 	 */
 	private L4JElasticAppender(String name, Filter filter, Layout<? extends Serializable> layout, final boolean ignoreExceptions,
-			String index, NodeConnection[] nodeConnections, boolean useBulk, int bulkSize,
-			String user, String password, int maxUnprocessedLogs, DateFormat dateFormat) {
+			NodeConnection[] nodeConnections, boolean useBulk, int bulkSize,
+			String user, String password, int maxUnprocessedLogs, LogIndex logIndex) {
 		super(name, filter, layout, ignoreExceptions);
-		this.index = index;
 		this.nodeConnections = nodeConnections;
 		this.useBulk = useBulk;
 		this.user = user;
 		this.password = password;
-		this.dateFormat = dateFormat;
+		this.logIndex = logIndex;
 		if(!useBulk || bulkSize < 2)
 			this.bulkSize = 1;
 		else
@@ -170,6 +167,13 @@ public class L4JElasticAppender extends AbstractAppender {
 	public static String getPrefix() {
 		return L4JElasticAppender.INDEX_PREFFIX;
 	}
+	
+	/**
+	 * @return Gets the currently used Elasticsearch nodes.
+	 */
+	public NodeConnection[] getNodeConnections() {
+		return this.nodeConnections;
+	}
 
 	/**
 	 * @return Returns {@code true} if appender was set to use logs during initialization. It MAY behave as
@@ -183,8 +187,7 @@ public class L4JElasticAppender extends AbstractAppender {
 	 * Used to calculate a new date and thus index name using current date/time.
 	 */
 	public void calculateCurrentDate() {
-		this.computedDate = this.dateFormat.format(new Date());
-		this.computedIndex = new StringBuilder().append(L4JElasticAppender.INDEX_PREFFIX).append(this.index).append("_").append(this.computedDate).toString();
+		this.logIndex.recalculateIndex();
 	}
 
 	/**
@@ -193,19 +196,44 @@ public class L4JElasticAppender extends AbstractAppender {
 	public long getNumSwallowed() {
 		return this.swallowedLogs.get();
 	}
-	
-	/**
-	 * @return Computed date used to distinguish log indexes.
-	 */
-	public String getCurrentComputedDate() {
-		return this.computedDate;
-	}
 
 	/**
 	 * @return Computed index name to persist logs into.
 	 */
-	public String getCurrentComputedIndex() {
-		return this.computedDate;
+	public String getCurrentIndexString() {
+		return this.logIndex.getIndexName();
+	}
+	
+	/**
+	 * @return Computing class instance responsible for index name generation.
+	 */
+	public LogIndex getCurrentIndex() {
+		return this.logIndex;
+	}
+	
+	/**
+	 * Can be used by {@link EASearch} or other classes to get a <b>new</b> connection
+	 * to the cluster using the original nodes informations and authorization.
+	 * 
+	 * @return Brand new Elasticsearch connection duplicating currently used.
+	 */
+	public RestHighLevelClient duplicateConnection() {
+		Objects.requireNonNull(this.restClient, "RestClient is not created yet.");
+		
+		HttpHost[] hosts = Arrays.stream(this.nodeConnections)
+				.map(node -> node.getHttpHost())
+				.collect(Collectors.toList())
+				.toArray(new HttpHost[this.nodeConnections.length]);
+		
+		RestClientBuilder restClientBuilder = RestClient.builder(hosts);
+		
+		if(this.credentialsProvider != null) {
+			restClientBuilder.setHttpClientConfigCallback(callback -> {
+				return callback.setDefaultCredentialsProvider(this.credentialsProvider);
+			});
+		}
+		
+		return new RestHighLevelClient(restClientBuilder);
 	}
 
 	/**
@@ -219,12 +247,12 @@ public class L4JElasticAppender extends AbstractAppender {
 				.toArray(new HttpHost[this.nodeConnections.length]);
 
 		RestClientBuilder restClientBuilder = RestClient.builder(hosts);
-
+		
 		if(this.user != null && !this.user.isEmpty()) {
-			CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-			credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(this.user, this.password));
+			this.credentialsProvider = new BasicCredentialsProvider();
+			this.credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(this.user, this.password));
 			restClientBuilder.setHttpClientConfigCallback(callback -> {
-				return callback.setDefaultCredentialsProvider(credentialsProvider);
+				return callback.setDefaultCredentialsProvider(this.credentialsProvider);
 			});
 		}
 
@@ -249,7 +277,7 @@ public class L4JElasticAppender extends AbstractAppender {
 	@Override
 	public void append(LogEvent event) {
 		String log = new String(this.getLayout().toByteArray(event));
-		IndexRequest logRequest = new IndexRequest(this.computedIndex)
+		IndexRequest logRequest = new IndexRequest(this.getCurrentIndexString())
 				.source(log, XContentType.JSON);
 		try {
 			if(!this.requestAsyncBatch.offer(logRequest, 1, TimeUnit.SECONDS)) {
@@ -387,8 +415,8 @@ public class L4JElasticAppender extends AbstractAppender {
 				this.connectionNodes = new NodeConnection[] { NodeConnection.fromLocalhost() };
 			}
 
-			return new L4JElasticAppender(this.getName(), this.getFilter(), this.getOrCreateLayout(), this.isIgnoreExceptions(), this.index, this.connectionNodes,
-					this.useBulk, this.bulkSize, this.user, this.password, this.maxUnprocessedLogs, new SimpleDateFormat(dateFormat));
+			return new L4JElasticAppender(this.getName(), this.getFilter(), this.getOrCreateLayout(), this.isIgnoreExceptions(), this.connectionNodes,
+					this.useBulk, this.bulkSize, this.user, this.password, this.maxUnprocessedLogs, LogIndex.ofStandard(index, dateFormat));
 		}
 	}
 }
