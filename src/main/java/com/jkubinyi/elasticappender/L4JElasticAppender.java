@@ -1,5 +1,6 @@
 package com.jkubinyi.elasticappender;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.security.InvalidParameterException;
@@ -287,6 +288,16 @@ public class L4JElasticAppender extends AbstractAppender {
 		} catch(Exception e) {
 			LOGGER.error("Error during stashing log: ", e);
 		}
+	}
+	
+	@Override
+	public boolean stop(long timeout, TimeUnit timeUnit) {
+		try {
+			this.restClient.close();
+		} catch(IOException e) {
+			LOGGER.error("Cannot close client: ", e);
+		}
+		return super.stop(timeout, timeUnit);
 	}
 
 	/**
