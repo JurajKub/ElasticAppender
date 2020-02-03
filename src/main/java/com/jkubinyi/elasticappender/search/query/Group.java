@@ -69,6 +69,54 @@ public class Group extends AbstractLevelGenerator {
 		return this;
 	}
 	
+	public Group queryString(Field field, String query, ComparisonOperator operator) {
+		SimpleQueryString q = SimpleQueryString.of(field, query, comparisonOperator);
+		this.add(q);
+		return this;
+	}
+
+	public Group queryString(Field field, String query) {
+		SimpleQueryString q = SimpleQueryString.of(field, query);
+		this.add(q);
+		return this;
+	}
+
+	public Group simpleQueryString(List<Field> fields, String query, ComparisonOperator operator) {
+		SimpleQueryString q = SimpleQueryString.of(fields, query, comparisonOperator);
+		this.add(q);
+		return this;
+	}
+
+	public Group simpleQueryString(List<Field> fields, String query) {
+		SimpleQueryString q = SimpleQueryString.of(fields, query);
+		this.add(q);
+		return this;
+	}
+	
+	public Group simpleQueryString(Field field, String query, ComparisonOperator operator) {
+		SimpleQueryString q = SimpleQueryString.of(field, query, comparisonOperator);
+		this.add(q);
+		return this;
+	}
+
+	public Group simpleQueryString(Field field, String query) {
+		SimpleQueryString q = SimpleQueryString.of(field, query);
+		this.add(q);
+		return this;
+	}
+
+	public Group queryString(List<Field> fields, String query, ComparisonOperator operator) {
+		QueryString q = QueryString.of(fields, query, comparisonOperator);
+		this.add(q);
+		return this;
+	}
+
+	public Group queryString(List<Field> fields, String query) {
+		QueryString q = QueryString.of(fields, query);
+		this.add(q);
+		return this;
+	}
+	
 	public Group range(Field field, RangeValue value, ComparisonOperator operator) {
 		Range range = Range.of(field, value, comparisonOperator);
 		this.add(range);

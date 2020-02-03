@@ -28,21 +28,21 @@ public class QueryString extends AbstractLeafLevelGenerator {
 	private boolean moreFields = false;
 	private List<Field> fieldsList = new ArrayList<>();
 
-	private QueryString(Field field, String value) {
-		super(field, value);
+	private QueryString(Field field, String query) {
+		super(field, query);
 	}
 
-	private QueryString(Field field, String value, ComparisonOperator operator) {
-		super(field, value, operator);
+	private QueryString(Field field, String query, ComparisonOperator operator) {
+		super(field, query, operator);
 	}
 
-	private QueryString(List<Field> fields, String value, ComparisonOperator operator) {
-		super(null, value, operator);
+	private QueryString(List<Field> fields, String query, ComparisonOperator operator) {
+		super(null, query, operator);
 		this.moreFields = true;
 	}
 
-	private QueryString(List<Field> fields, String value) {
-		super(null, value);
+	private QueryString(List<Field> fields, String query) {
+		super(null, query);
 		this.moreFields = true;
 	}
 
@@ -54,8 +54,8 @@ public class QueryString extends AbstractLeafLevelGenerator {
 	 * @param operator Condition against which will be the field's value evaluated.
 	 * @return Leaf query instance.
 	 */
-	public static QueryString of(Field field, String value, ComparisonOperator operator) {
-		return new QueryString(field, value, operator);
+	public static QueryString of(Field field, String query, ComparisonOperator operator) {
+		return new QueryString(field, query, operator);
 	}
 
 	/**
@@ -66,8 +66,8 @@ public class QueryString extends AbstractLeafLevelGenerator {
 	 * @param value Value which will be document's values evaluated against.e.
 	 * @return Leaf query instance.
 	 */
-	public static QueryString of(Field field, String value) {
-		return new QueryString(field, value);
+	public static QueryString of(Field field, String query) {
+		return new QueryString(field, query);
 	}
 
 	/**
