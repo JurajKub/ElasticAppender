@@ -213,6 +213,16 @@ public class EASearch {
 	public BooleanQueryBuilder booleanQuery() {
 		return new BooleanQueryBuilder();
 	}
+	
+	/**
+	 * Closes the underlying Easticsearch stream and releases system resources.
+	 * <b>It should be called when it is no longer needed to communicate with ES nodes anymore.</b>
+	 * 
+	 * @throws IOException If an I/O error occurs.
+	 */
+	public void close() throws IOException {
+		this.restClient.close();
+	}
 
 	/**
 	 * All ElasticAppender query builders should implement this interface.
