@@ -108,14 +108,15 @@ public abstract class AbstractLevelGenerator {
 	protected QueryBuilder buildQuery() {
 		if (this.allNodes.size() > 0) {
 			BoolQueryBuilder root = QueryBuilders.boolQuery();
-			// BoolQueryBuilder activeRoot = root;
 			Map<LogicalOperator, Collection<AbstractLevelGenerator>> nodesMap = this.allNodes.asMap();
-			// LogicalOperator firstOperator = nodesMap.keySet().stream().findFirst().get();
+			boolean onlyOneOperation = false; // Used for optimization
+			if(nodesMap.size() == 1)
+				onlyOneOperation = true;
 
 			for (Entry<LogicalOperator, Collection<AbstractLevelGenerator>> entry : nodesMap.entrySet()) {
 				LogicalOperator logicOperator = entry.getKey();
 				Collection<AbstractLevelGenerator> nodes = entry.getValue();
-				BoolQueryBuilder currentRoot = QueryBuilders.boolQuery();
+				BoolQueryBuilder currentRoot = (!onlyOneOperation) ? currentRoot = QueryBuilders.boolQuery() : root;
 
 				if (logicOperator == LogicalOperator.and) {
 
@@ -139,7 +140,8 @@ public abstract class AbstractLevelGenerator {
 								notEqualsNodes.forEach(concreteNode -> {
 									currentRoot.mustNot(concreteNode.buildQuery());
 								});
-								root.must(currentRoot);
+								
+								if(root != currentRoot) root.must(currentRoot);
 							}
 						}
 					} else {
@@ -151,7 +153,8 @@ public abstract class AbstractLevelGenerator {
 					}
 				} else {
 					nodes.forEach(concreteNode -> currentRoot.should(concreteNode.buildQuery()));
-					root.must(currentRoot);
+					
+					if(root != currentRoot) root.must(currentRoot);
 				}
 			}
 			return root;

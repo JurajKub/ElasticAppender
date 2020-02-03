@@ -353,7 +353,6 @@ public class EASearch {
 						try {
 							return mapper.readValue(BytesReference.toBytes(hit.getSourceRef()), LogRecord.class);
 						} catch (IOException e) {
-							e.printStackTrace();
 							return null;
 						}
 					}).filter(Objects::nonNull).collect(Collectors.toSet());
@@ -367,7 +366,6 @@ public class EASearch {
 						try {
 							return mapper.readValue(BytesReference.toBytes(hit.getSourceRef()), LogRecord.class);
 						} catch (IOException e) {
-							e.printStackTrace();
 							return null;
 						}
 					}).filter(Objects::nonNull).collect(Collectors.toSet());
