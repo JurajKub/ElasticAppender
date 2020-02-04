@@ -24,10 +24,11 @@ public class OperationalTest {
 	
 	@Before()
 	public void preInit() {
-		this.search = EASearch.ofAnonymous(
-			LogIndex.ofStandard("log", "yyyyMMdd"),
-			new HttpHost[] { new HttpHost("URL", 9200, "http") }
-		);
+		if(this.search == null)
+			this.search = EASearch.ofAnonymous(
+				LogIndex.ofStandard("log", "yyyyMMdd"),
+				new HttpHost[] { new HttpHost("URL", 9200, "http") }
+			);
 		
 		log.error(OperationalTest.TEST_TERM_MESSAGE);
 	}

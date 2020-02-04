@@ -24,12 +24,14 @@ public class SimpleSearchTest {
 	
 	@Before()
 	public void preInit() {
-		this.eaSearch = EASearch.ofAnonymous(
-			LogIndex.ofStandard("log", "yyyyMMdd"),
-			new HttpHost[] { new HttpHost("URL", 9200, "http") }
-		);
-		
-		this.search = new SimplifiedSearch(this.eaSearch);
+		if(this.eaSearch == null) {
+			this.eaSearch = EASearch.ofAnonymous(
+				LogIndex.ofStandard("log", "yyyyMMdd"),
+				new HttpHost[] { new HttpHost("URL", 9200, "http") }
+			);
+			
+			this.search = new SimplifiedSearch(this.eaSearch);
+		}
 		
 		log.error(SimpleSearchTest.TEST_SIMPLIFIED_MESSAGE);
 	}
